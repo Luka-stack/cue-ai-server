@@ -9,7 +9,7 @@ dependencies = [
     "asyncpg>=0.31.0",
     "fastapi>=0.140.7",
     "langchain-core>=1.6",
-    "langchain-ollama>=1.1",
+    "langchain-openai>=1.0",
     "langgraph>=1.2",
     "langgraph-checkpoint-postgres>=3.0",
     "psycopg[binary,pool]>=3.2",
@@ -50,7 +50,7 @@ select = [
 [tool.ruff.lint.per-file-ignores]
 # Alembic migrations are generated code; don't hold them to hand-written style.
 "alembic/versions/*" = ["E501", "W291", "UP007", "UP035", "I001"]
-# Prompt text is kept byte-identical to the validated notebook version; do not rewrap it.
+# Prompt text is written one paragraph per line; do not rewrap it.
 "app/agent/prompts.py" = ["E501"]
 
 [tool.pytest.ini_options]

@@ -73,7 +73,7 @@ class NoPendingReviewError(AppError):
 
 
 class AgentUnavailableError(AppError):
-    """The chat model (Ollama) could not be reached or failed."""
+    """The chat model (OpenAI) could not be reached or failed."""
 
     status_code = status.HTTP_503_SERVICE_UNAVAILABLE
 

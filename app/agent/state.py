@@ -75,10 +75,11 @@ def conversation_only(messages: list[AnyMessage]) -> list[AnyMessage]:
     for m in messages:
         if isinstance(m, ToolMessage):
             continue
-        if isinstance(m, AIMessage) and m.tool_calls:
-            if not m.content:
+        if isinstance(m, AIMessage):
+            if not m.text:
                 continue
-            m = AIMessage(content=m.content)  # keep the prose, drop the tool call
+            # Keep the prose only: no tool calls, no reasoning items from another request.
+            m = AIMessage(content=m.text)
         kept.append(m)
     return kept
 

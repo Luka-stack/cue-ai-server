@@ -148,7 +148,9 @@ async def test_note_is_staged_then_saved_on_accept(client, user, model):
     ]
 
     # The accepted note is an item the app lists, under the id the review showed.
-    assert await _items(client, user) == [
+    items = await _items(client, user)
+    assert items[0].pop("updated_at")
+    assert items == [
         {
             "id": record["doc_id"],
             "type": "note",

@@ -27,19 +27,17 @@ def build_graph(
     nodes = MemoryAgentNodes(model, memory)
 
     builder = StateGraph(MemoryState)
-    builder.add_node("task_maistro", nodes.task_maistro)
+    builder.add_node("cue_brain", nodes.cue_brain)
     builder.add_node("propose_memory", nodes.propose_memory)
     builder.add_node("review_memory", nodes.review_memory)
     builder.add_node("save_memory", nodes.save_memory)
     builder.add_node("update_instructions", nodes.update_instructions)
-    builder.add_node("find_todos", nodes.find_todos)
 
-    builder.add_edge(START, "task_maistro")
-    builder.add_conditional_edges("task_maistro", route_message)
+    builder.add_edge(START, "cue_brain")
+    builder.add_conditional_edges("cue_brain", route_message)
     # propose_memory and review_memory route themselves with Command, so the only static
     # edges left here are the ways back into the conversation.
-    builder.add_edge("save_memory", "task_maistro")
-    builder.add_edge("update_instructions", "task_maistro")
-    builder.add_edge("find_todos", "task_maistro")
+    builder.add_edge("save_memory", "cue_brain")
+    builder.add_edge("update_instructions", "cue_brain")
 
     return builder.compile(checkpointer=checkpointer, store=store)

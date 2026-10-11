@@ -1,4 +1,4 @@
-"""A chat model that replays scripted responses, so the agent graph runs without Ollama."""
+"""A chat model that replays scripted responses, so the agent graph runs without OpenAI."""
 
 import uuid
 from collections.abc import Sequence

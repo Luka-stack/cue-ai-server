@@ -54,34 +54,20 @@ class ChatMessageRead(BaseModel):
     tool_calls: list[ToolCallRead] | None = None
 
 
-def _text_of(message: AnyMessage) -> str:
-    content = message.content
-    if isinstance(content, str):
-        return content
-    # Multimodal / block content: keep only the text blocks.
-    parts = []
-    for block in content:
-        if isinstance(block, str):
-            parts.append(block)
-        elif isinstance(block, dict) and block.get("type") == "text":
-            parts.append(block.get("text", ""))
-    return "".join(parts)
-
-
 def to_chat_message(message: AnyMessage) -> ChatMessageRead | None:
     """Map a LangChain message to the API shape; ``None`` for kinds the client never shows."""
     if isinstance(message, HumanMessage):
-        return ChatMessageRead(id=message.id or "", role="user", content=_text_of(message))
+        return ChatMessageRead(id=message.id or "", role="user", content=message.text)
     if isinstance(message, AIMessage):
         tool_calls = [ToolCallRead(name=tc["name"], args=tc["args"]) for tc in message.tool_calls]
         return ChatMessageRead(
             id=message.id or "",
             role="assistant",
-            content=_text_of(message),
+            content=message.text,
             tool_calls=tool_calls or None,
         )
     if isinstance(message, ToolMessage):
-        return ChatMessageRead(id=message.id or "", role="tool", content=_text_of(message))
+        return ChatMessageRead(id=message.id or "", role="tool", content=message.text)
     return None
 
 

@@ -5,7 +5,7 @@ A dedicated ``cueai_test`` database is dropped/recreated once per session and
 its schema is applied via Alembic, so migrations are exercised by every run.
 
 The chat agent runs against an in-memory checkpointer/store and a scripted chat model,
-so the suite needs no Ollama and no LangGraph tables.
+so the suite needs no OpenAI key and no LangGraph tables.
 """
 
 import asyncio
@@ -84,7 +84,7 @@ async def client(test_engine: AsyncEngine, model: ScriptedChatModel) -> AsyncIte
                 await session.rollback()
                 raise
 
-    # Lifespan is intentionally not run: it pings the dev-settings engine and Ollama,
+    # Lifespan is intentionally not run: it pings the dev-settings engine and OpenAI,
     # while every request-scoped DB access goes through the overridden dependency and
     # the agent runtime is built here with the scripted model.
     app = create_app()

@@ -13,7 +13,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-import httpx
+import openai
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AnyMessage, HumanMessage
 from langgraph.graph.state import CompiledStateGraph
@@ -100,7 +100,7 @@ class AgentRuntime:
         model: BaseChatModel | None = None,
         session_factory: async_sessionmaker[AsyncSession] | None = None,
     ) -> "AgentRuntime":
-        """Build the runtime. ``model`` and ``session_factory`` default to Ollama and the
+        """Build the runtime. ``model`` and ``session_factory`` default to OpenAI and the
         application database; tests pass their own."""
         if session_factory is None:
             from app.db.session import async_session_factory as session_factory
@@ -117,7 +117,7 @@ class AgentRuntime:
             graph,
             persistence,
             turn_timeout_s=settings.agent_turn_timeout_s,
-            model_name=settings.ollama_model,
+            model_name=settings.openai_model,
         )
 
     async def aclose(self) -> None:
@@ -213,16 +213,11 @@ class AgentRuntime:
         except TimeoutError:
             logger.error("agent turn on thread %s exceeded %.0fs", thread_id, self._turn_timeout_s)
             raise AgentTimeoutError() from None
-        except (httpx.HTTPError, ConnectionError) as exc:
-            logger.error("chat model unreachable: %s", exc)
+        except openai.APIError as exc:
+            # Connection failures, auth, rate limits and server errors alike: the chat is
+            # unavailable, the rest of the API is not.
+            logger.error("chat model error: %s", exc)
             raise AgentUnavailableError() from exc
-        except Exception as exc:
-            # ollama.ResponseError and friends are raised from inside the graph; avoid a
-            # hard import dependency on the ollama package here.
-            if exc.__class__.__module__.startswith("ollama"):
-                logger.error("chat model error: %s", exc)
-                raise AgentUnavailableError(str(exc)) from exc
-            raise
 
         after = await self.get_snapshot(thread_id, user_id)
         seen = {m.id for m in before.messages}

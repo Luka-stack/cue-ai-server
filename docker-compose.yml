@@ -23,11 +23,9 @@ services:
     environment:
       CUEAI_DATABASE_URL: postgresql+asyncpg://cueai:cueai@db:5432/cueai
       CUEAI_APP_ENV: prod
-      # Ollama runs on the host (it needs the GPU); reach it through the Docker host alias.
-      CUEAI_OLLAMA_BASE_URL: http://host.docker.internal:11434
-      CUEAI_OLLAMA_MODEL: qwen3:8b
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+      # Taken from .env (or the shell) when compose starts.
+      CUEAI_OPENAI_API_KEY: ${CUEAI_OPENAI_API_KEY:?set CUEAI_OPENAI_API_KEY in .env}
+      CUEAI_OPENAI_MODEL: ${CUEAI_OPENAI_MODEL:-gpt-5.4-nano}
     ports:
       - "8000:8000"
 

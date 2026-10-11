@@ -149,7 +149,9 @@ async def test_todo_saved_in_chat_appears_in_the_app(client, user, model):
 
     resp = await client.get(f"{ITEMS}/{doc_id}", headers=user)
     assert resp.status_code == 200
-    assert resp.json() == {
+    item = resp.json()
+    assert item.pop("updated_at")
+    assert item == {
         "id": doc_id,
         "type": "todo",
         "title": "Book a vet appointment",
@@ -201,6 +203,7 @@ async def test_chat_patch_changes_only_what_the_user_asked(client, user, model):
     await _review(client, user, thread_id)
 
     after = (await client.get(f"{ITEMS}/{todo['id']}", headers=user)).json()
+    assert after.pop("updated_at") > todo.pop("updated_at")
     assert after == {**todo, "date": "2026-10-01T09:00:00Z"}
 
 
@@ -370,92 +373,3 @@ async def test_todo_extra_fields_round_trip_and_are_rejected_on_notes(client, us
         ITEMS, headers=user, json={"type": "todo", "title": "x", "time_to_complete": 0}
     )
     assert resp.status_code == 422
-
-
-# ------------------------------------------------------------------ questions
-
-
-async def test_find_todos_returns_only_open_todos_due_in_the_range(client, user, model):
-    """"What's due tomorrow?" is a read: the lookup filters by local day, never proposes."""
-    # 22:30Z on the 15th is already the 16th in Warsaw, so it belongs to the 16th.
-    await _create_item(
-        client, user, {"type": "todo", "title": "Call the plumber", "date": "2026-10-15T22:30:00Z"}
-    )
-    await _create_item(
-        client, user, {"type": "todo", "title": "Pay rent", "date": "2026-10-15T08:00:00Z"}
-    )
-    done = await _create_item(
-        client, user, {"type": "todo", "title": "Water plants", "date": "2026-10-16T09:00:00Z"}
-    )
-    await client.patch(f"{ITEMS}/{done['id']}", headers=user, json={"completed": True})
-    await _create_item(client, user, {"type": "todo", "title": "Someday task"})
-
-    thread_id = await _new_thread(client, user)
-    model.script(
-        ai(
-            "",
-            tool_call(
-                "FindTodos", {"period": "dates", "start": "2026-10-16", "end": "2026-10-16"}
-            ),
-        ),
-        ai("Tomorrow you need to call the plumber."),
-    )
-    body = await _send(client, user, thread_id, "What's due tomorrow?", tz="Europe/Warsaw")
-
-    assert body["status"] == "completed"
-    assert body["pending_review"] is None
-    assert body["messages"][-1]["content"] == "Tomorrow you need to call the plumber."
-
-    # The second model call saw the lookup's result as the last message.
-    lookup = str(model.received[1][-1].content)
-    assert "Call the plumber" in lookup
-    assert "Friday, October 16, 2026 at 12:30 AM" in lookup
-    for left_out in ("Pay rent", "Water plants", "Someday task"):
-        assert left_out not in lookup
-
-
-async def test_find_todos_without_a_range_lists_every_open_todo(client, user, model):
-    await _create_item(
-        client, user, {"type": "todo", "title": "Later", "date": "2026-11-01T09:00:00Z"}
-    )
-    await _create_item(
-        client, user, {"type": "todo", "title": "Sooner", "date": "2026-10-20T09:00:00Z"}
-    )
-    await _create_item(client, user, {"type": "todo", "title": "Undated"})
-
-    thread_id = await _new_thread(client, user)
-    model.script(
-        ai("", tool_call("FindTodos", {"period": "all"})),
-        ai("Here is everything."),
-    )
-    await _send(client, user, thread_id, "What do I need to do?", tz="UTC")
-
-    lookup = str(model.received[1][-1].content)
-    assert lookup.index("Sooner") < lookup.index("Later") < lookup.index("Undated")
-
-
-def test_find_todos_periods_resolve_to_local_days():
-    from datetime import date
-
-    from app.agent.nodes import _period_bounds
-
-    saturday = date(2026, 10, 10)
-
-    def bounds(**args):
-        return _period_bounds(args, saturday)[:2]
-
-    assert bounds(period="all") == (None, None)
-    assert bounds(period="today") == (saturday, saturday)
-    assert bounds(period="tomorrow") == (date(2026, 10, 11),) * 2
-    assert bounds(period="this_week") == (date(2026, 10, 5), date(2026, 10, 11))
-    assert bounds(period="next_week") == (date(2026, 10, 12), date(2026, 10, 18))
-    assert bounds(period="next_7_days") == (saturday, date(2026, 10, 16))
-    assert bounds(period="dates", start="2026-10-20") == (date(2026, 10, 20),) * 2
-    assert bounds(period="dates", start="2026-10-22", end="2026-10-20") == (
-        date(2026, 10, 20),
-        date(2026, 10, 22),
-    )
-    # Anything unusable lists everything rather than hiding todos.
-    assert bounds(period="dates") == (None, None)
-    assert bounds(period="someday") == (None, None)
-    assert bounds() == (None, None)

@@ -23,7 +23,7 @@ details the user typed in the app always survive an agent edit.
 import logging
 import uuid
 from collections.abc import Callable, Iterable
-from datetime import UTC, date, datetime, tzinfo
+from datetime import UTC, datetime, tzinfo
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -36,10 +36,6 @@ from app.repositories.item_repository import ItemRepository
 logger = logging.getLogger(__name__)
 
 Document = dict[str, Any]
-
-# Todos a "what do I need to do" question should leave out.
-CLOSED_TODO_STATUSES = frozenset({"done", "archived"})
-
 
 # ----------------------------------------------------------------- item -> document
 
@@ -62,12 +58,9 @@ def todo_document(item: Item, zone: tzinfo) -> Document:
         "task": item.title or "",
         "time_to_complete": item.time_to_complete,
         "deadline": _local_naive(item.date, zone),
+        "solutions": list(item.solutions or []),
         "status": item.status or DEFAULT_TODO_STATUS,
     }
-    # Omitted rather than [] when empty: ToDo requires at least one solution when one is
-    # given, and the default applies only when the key is absent.
-    if item.solutions:
-        doc["solutions"] = list(item.solutions)
     # Round-tripping through the schema serializes exactly as the extractor's output
     # does, so an unchanged field compares equal in the review diff.
     return ToDo.model_validate(doc).model_dump(mode="json")
@@ -190,26 +183,6 @@ class ItemMemory:
             to_prompt_document(kind, item, zone)
             for item in await self._items(kind, user_id)
         ]
-
-    async def find_todos(
-        self, user_id: str, zone: tzinfo, start: date | None, end: date | None
-    ) -> list[Document]:
-        """Open todos whose deadline falls on ``start``..``end`` (local days, inclusive),
-        soonest first. With neither bound, every open todo; undated ones come last."""
-        found: list[tuple[datetime | None, Document]] = []
-        for item in await self._items("todo", user_id):
-            if item.status in CLOSED_TODO_STATUSES:
-                continue
-            due = _local_naive(item.date, zone)
-            if start or end:
-                if due is None:
-                    continue
-                if (start and due.date() < start) or (end and due.date() > end):
-                    continue
-            found.append((due, to_prompt_document("todo", item, zone)))
-
-        found.sort(key=lambda pair: (pair[0] is None, pair[0] or datetime.min))
-        return [doc for _, doc in found]
 
     async def apply(
         self,
