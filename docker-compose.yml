@@ -1,0 +1,35 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: cueai
+      POSTGRES_PASSWORD: cueai
+      POSTGRES_DB: cueai
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cueai -d cueai"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      CUEAI_DATABASE_URL: postgresql+asyncpg://cueai:cueai@db:5432/cueai
+      CUEAI_APP_ENV: prod
+      # Ollama runs on the host (it needs the GPU); reach it through the Docker host alias.
+      CUEAI_OLLAMA_BASE_URL: http://host.docker.internal:11434
+      CUEAI_OLLAMA_MODEL: qwen3:8b
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "8000:8000"
+
+volumes:
+  pgdata:

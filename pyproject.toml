@@ -1,0 +1,60 @@
+[project]
+name = "cueai-server"
+version = "0.1.0"
+description = "Backend API for the CueAI capture-inbox app"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "alembic>=1.18.5",
+    "asyncpg>=0.31.0",
+    "fastapi>=0.140.7",
+    "langchain-core>=1.6",
+    "langchain-ollama>=1.1",
+    "langgraph>=1.2",
+    "langgraph-checkpoint-postgres>=3.0",
+    "psycopg[binary,pool]>=3.2",
+    "pydantic>=2.13.4",
+    "pydantic-settings>=2.14.2",
+    "sqlalchemy[asyncio]>=2.0.51",
+    "trustcall>=0.0.39",
+    "tzdata>=2026.3",
+    "uvicorn[standard]>=0.51.0",
+]
+
+[dependency-groups]
+dev = [
+    "asgi-lifespan>=2.1.0",
+    "httpx>=0.28.1",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "ruff>=0.16.0",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "E",     # pycodestyle errors
+    "W",     # pycodestyle warnings
+    "F",     # pyflakes
+    "I",     # isort
+    "B",     # flake8-bugbear
+    "UP",    # pyupgrade
+    "ASYNC", # flake8-async
+    "SIM",   # flake8-simplify
+    "C4",    # flake8-comprehensions
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Alembic migrations are generated code; don't hold them to hand-written style.
+"alembic/versions/*" = ["E501", "W291", "UP007", "UP035", "I001"]
+# Prompt text is kept byte-identical to the validated notebook version; do not rewrap it.
+"app/agent/prompts.py" = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
