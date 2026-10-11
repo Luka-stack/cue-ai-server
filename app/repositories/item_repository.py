@@ -36,13 +36,15 @@ class ItemRepository:
             stmt = stmt.where(Item.type == "todo")
         elif filter_ == "today":
             start, end = today_bounds
-            stmt = stmt.where(Item.type == "todo", Item.date >= start, Item.date < end)
+            stmt = stmt.where(
+                Item.type == "todo", Item.deadline >= start, Item.deadline < end
+            )
 
-        # Client ordering contract: notes first, then todos by date descending,
+        # Client ordering contract: notes first, then todos by deadline descending,
         # undated todos last; newest-created wins ties.
         stmt = stmt.order_by(
             case((Item.type == "todo", 1), else_=0),
-            Item.date.desc().nulls_last(),
+            Item.deadline.desc().nulls_last(),
             Item.created_at.desc(),
         )
 
@@ -72,6 +74,7 @@ class ItemRepository:
     ) -> Sequence[Item]:
         if not item_ids:
             return []
+
         stmt = select(Item).where(Item.user_id == user_id, Item.id.in_(item_ids))
         return (await self._session.scalars(stmt)).all()
 
@@ -80,6 +83,7 @@ class ItemRepository:
         # Someone else's item is indistinguishable from a missing one.
         if item is None or item.user_id != user_id:
             return None
+
         return item
 
     async def add(self, item: Item) -> Item:
@@ -102,7 +106,7 @@ class ItemRepository:
             func.count().filter(Item.type == "note").label("notes"),
             func.count().filter(is_todo, Item.completed.is_(True)).label("completed"),
             func.count()
-            .filter(is_todo, Item.date >= start, Item.date < end)
+            .filter(is_todo, Item.deadline >= start, Item.deadline < end)
             .label("today"),
         ).where(Item.user_id == user_id)
         row = (await self._session.execute(stmt)).one()

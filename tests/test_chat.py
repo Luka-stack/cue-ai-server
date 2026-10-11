@@ -62,13 +62,19 @@ async def test_threads_are_scoped_to_user(client, user):
     other = {"X-User-Id": "someone-else"}
 
     assert (await client.get(THREADS, headers=other)).json() == []
-    assert (await client.get(f"{THREADS}/{thread_id}", headers=other)).status_code == 404
-    assert (await client.delete(f"{THREADS}/{thread_id}", headers=other)).status_code == 404
+    assert (
+        await client.get(f"{THREADS}/{thread_id}", headers=other)
+    ).status_code == 404
+    assert (
+        await client.delete(f"{THREADS}/{thread_id}", headers=other)
+    ).status_code == 404
 
 
 async def test_unknown_thread_is_404(client, user):
     assert (await client.get(f"{THREADS}/not-a-uuid", headers=user)).status_code == 404
-    assert (await client.get(f"{THREADS}/{uuid.uuid4()}", headers=user)).status_code == 404
+    assert (
+        await client.get(f"{THREADS}/{uuid.uuid4()}", headers=user)
+    ).status_code == 404
 
 
 async def test_new_thread_is_empty_and_completed(client, user):
@@ -113,7 +119,9 @@ async def test_blank_message_rejected(client, user):
 
 async def test_note_is_staged_then_saved_on_accept(client, user, model):
     thread_id = await _new_thread(client, user)
-    model.script(*_note_script("Spare key", "Under the blue flowerpot", "Saved the note."))
+    model.script(
+        *_note_script("Spare key", "Under the blue flowerpot", "Saved the note.")
+    )
 
     resp = await client.post(
         f"{THREADS}/{thread_id}/messages",
@@ -129,7 +137,10 @@ async def test_note_is_staged_then_saved_on_accept(client, user, model):
     assert len(review["records"]) == 1
     record = review["records"][0]
     assert record["is_new"] is True
-    assert record["value"] == {"title": "Spare key", "content": "Under the blue flowerpot"}
+    assert record["value"] == {
+        "title": "Spare key",
+        "content": "Under the blue flowerpot",
+    }
     # The tool-call-only assistant turn is internal; only the user's message is visible.
     assert [m["role"] for m in body["messages"]] == ["user"]
 
@@ -164,12 +175,14 @@ async def test_reject_discards_the_draft(client, user, model):
     thread_id = await _new_thread(client, user)
     model.script(
         ai("", tool_call("UpdateMemory", {"update_type": "todo"})),
-        ai("", tool_call("ToDo", {"task": "Buy cat food", "solutions": ["pet store"]})),
+        ai("", tool_call("ToDo", {"title": "Buy cat food"})),
         ai("Alright, I did not add it."),
     )
 
     resp = await client.post(
-        f"{THREADS}/{thread_id}/messages", headers=user, json={"content": "I need cat food"}
+        f"{THREADS}/{thread_id}/messages",
+        headers=user,
+        json={"content": "I need cat food"},
     )
     assert resp.json()["status"] == "awaiting_review"
     assert resp.json()["pending_review"]["kind"] == "todo"
@@ -190,7 +203,9 @@ async def test_revise_redrafts_and_reviews_again(client, user, model):
         ai("", tool_call("Note", {"title": "Spare key", "content": "under the pot"})),
     )
     resp = await client.post(
-        f"{THREADS}/{thread_id}/messages", headers=user, json={"content": "spare key note"}
+        f"{THREADS}/{thread_id}/messages",
+        headers=user,
+        json={"content": "spare key note"},
     )
     first = resp.json()["pending_review"]["records"][0]
 
@@ -204,7 +219,11 @@ async def test_revise_redrafts_and_reviews_again(client, user, model):
                     "json_doc_id": first["doc_id"],
                     "planned_edits": "mention the blue pot",
                     "patches": [
-                        {"op": "replace", "path": "/content", "value": "under the blue pot"}
+                        {
+                            "op": "replace",
+                            "path": "/content",
+                            "value": "under the blue pot",
+                        }
                     ],
                 },
             ),
@@ -249,10 +268,14 @@ async def test_review_without_pending_is_409(client, user):
 async def test_message_while_review_pending_is_409(client, user, model):
     thread_id = await _new_thread(client, user)
     model.script(*_note_script("A", None, "ok")[:2])
-    await client.post(f"{THREADS}/{thread_id}/messages", headers=user, json={"content": "note A"})
+    await client.post(
+        f"{THREADS}/{thread_id}/messages", headers=user, json={"content": "note A"}
+    )
 
     resp = await client.post(
-        f"{THREADS}/{thread_id}/messages", headers=user, json={"content": "another thing"}
+        f"{THREADS}/{thread_id}/messages",
+        headers=user,
+        json={"content": "another thing"},
     )
     assert resp.status_code == 409
     assert "pending" in resp.json()["detail"]
@@ -261,9 +284,13 @@ async def test_message_while_review_pending_is_409(client, user, model):
 async def test_thread_detail_exposes_history_and_pending_review(client, user, model):
     thread_id = await _new_thread(client, user)
     model.script(ai("Hi!"))
-    await client.post(f"{THREADS}/{thread_id}/messages", headers=user, json={"content": "hello"})
+    await client.post(
+        f"{THREADS}/{thread_id}/messages", headers=user, json={"content": "hello"}
+    )
     model.script(*_note_script("Vet", "Dr. K", "saved")[:2])
-    await client.post(f"{THREADS}/{thread_id}/messages", headers=user, json={"content": "vet note"})
+    await client.post(
+        f"{THREADS}/{thread_id}/messages", headers=user, json={"content": "vet note"}
+    )
 
     resp = await client.get(f"{THREADS}/{thread_id}", headers=user)
     body = resp.json()
@@ -288,11 +315,17 @@ async def test_thread_detail_exposes_history_and_pending_review(client, user, mo
 async def test_memory_is_shared_across_threads_of_a_user(client, user, model):
     first = await _new_thread(client, user)
     model.script(*_note_script("Wifi", "hunter2", "saved"))
-    await client.post(f"{THREADS}/{first}/messages", headers=user, json={"content": "wifi note"})
-    await client.post(f"{THREADS}/{first}/review", headers=user, json={"action": "accept"})
+    await client.post(
+        f"{THREADS}/{first}/messages", headers=user, json={"content": "wifi note"}
+    )
+    await client.post(
+        f"{THREADS}/{first}/review", headers=user, json={"action": "accept"}
+    )
 
     second = await _new_thread(client, user)
-    assert (await client.get(f"{THREADS}/{second}", headers=user)).json()["messages"] == []
+    assert (await client.get(f"{THREADS}/{second}", headers=user)).json()[
+        "messages"
+    ] == []
     assert [n["title"] for n in await _items(client, user)] == ["Wifi"]
 
     # ...and invisible to anyone else.
@@ -329,7 +362,9 @@ async def test_delete_thread_removes_history_but_keeps_memory(client, user, mode
     await client.post(
         f"{THREADS}/{thread_id}/messages", headers=user, json={"content": "keep this"}
     )
-    await client.post(f"{THREADS}/{thread_id}/review", headers=user, json={"action": "accept"})
+    await client.post(
+        f"{THREADS}/{thread_id}/review", headers=user, json={"action": "accept"}
+    )
 
     resp = await client.delete(f"{THREADS}/{thread_id}", headers=user)
     assert resp.status_code == 204

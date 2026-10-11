@@ -8,10 +8,15 @@ async def _seed(client) -> dict[str, str]:
     payloads = [
         {"type": "note", "title": "Note A"},
         {"type": "note", "title": "Note B"},
-        {"type": "todo", "title": "Old todo", "date": "2023-12-01T10:00:00Z"},
-        {"type": "todo", "title": "New todo", "date": "2026-07-27T10:00:00Z"},
+        {"type": "todo", "title": "Old todo", "deadline": "2023-12-01T10:00:00Z"},
+        {"type": "todo", "title": "New todo", "deadline": "2026-07-27T10:00:00Z"},
         {"type": "todo", "title": "Undated todo"},
-        {"type": "todo", "title": "Done todo", "date": "2026-01-01T08:00:00Z", "completed": True},
+        {
+            "type": "todo",
+            "title": "Done todo",
+            "deadline": "2026-01-01T08:00:00Z",
+            "completed": True,
+        },
     ]
     ids = {}
     for payload in payloads:
@@ -65,7 +70,7 @@ async def test_get_item_by_id(client):
     assert resp.status_code == 200
     body = resp.json()
     assert body["title"] == "New todo"
-    assert body["date"] == "2026-07-27T10:00:00Z"
+    assert body["deadline"] == "2026-07-27T10:00:00Z"
 
 
 async def test_get_missing_item_404(client):

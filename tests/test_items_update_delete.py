@@ -23,11 +23,12 @@ async def test_toggle_todo_completed(client):
 
 async def test_patch_todo_clear_date_with_null(client):
     todo = await _create(
-        client, {"type": "todo", "title": "Buy milk", "date": "2026-07-27T10:00:00Z"}
+        client,
+        {"type": "todo", "title": "Buy milk", "deadline": "2026-07-27T10:00:00Z"},
     )
-    resp = await client.patch(f"{ITEMS}/{todo['id']}", json={"date": None})
+    resp = await client.patch(f"{ITEMS}/{todo['id']}", json={"deadline": None})
     assert resp.status_code == 200
-    assert "date" not in resp.json()
+    assert "deadline" not in resp.json()
 
 
 async def test_patch_todo_empty_title_rejected(client):
@@ -42,7 +43,9 @@ async def test_patch_note_completed_or_date_rejected(client):
     resp = await client.patch(f"{ITEMS}/{note['id']}", json={"completed": True})
     assert resp.status_code == 422
 
-    resp = await client.patch(f"{ITEMS}/{note['id']}", json={"date": "2026-07-27T10:00:00Z"})
+    resp = await client.patch(
+        f"{ITEMS}/{note['id']}", json={"deadline": "2026-07-27T10:00:00Z"}
+    )
     assert resp.status_code == 422
 
 
@@ -52,7 +55,9 @@ async def test_patch_note_cannot_empty_both_title_and_content(client):
     assert resp.status_code == 422
 
     # But replacing title with content is fine.
-    resp = await client.patch(f"{ITEMS}/{note['id']}", json={"title": None, "content": "body"})
+    resp = await client.patch(
+        f"{ITEMS}/{note['id']}", json={"title": None, "content": "body"}
+    )
     assert resp.status_code == 200
     body = resp.json()
     assert "title" not in body

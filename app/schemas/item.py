@@ -1,6 +1,6 @@
 """Pydantic schemas mirroring the client contract in cue-ai/models/index.ts.
 
-Notes never expose ``date``/``completed`` (the fields are absent from the
+Notes never expose ``deadline``/``completed`` (the fields are absent from the
 model, not null), and todo dates serialize as UTC ISO-8601 with a ``Z``
 suffix — exactly what the React Native client's mocks contain.
 """
@@ -17,8 +17,6 @@ from pydantic import (
     PlainSerializer,
     model_validator,
 )
-
-from app.models.item import DEFAULT_TODO_STATUS, TodoStatus, is_completed
 
 
 def _require_aware(dt: datetime) -> datetime:
@@ -43,7 +41,6 @@ UTCDateTime = Annotated[
 IdStr = Annotated[str, BeforeValidator(str)]
 
 # Todo-only extras the chat agent fills in; the app may edit them too.
-Solutions = Annotated[list[Annotated[str, Field(min_length=1)]], Field(max_length=20)]
 Minutes = Annotated[int, Field(gt=0, le=60 * 24 * 365)]
 
 
@@ -66,11 +63,9 @@ class ToDoRead(_SchemaBase):
     id: IdStr
     type: Literal["todo"]
     title: str
-    date: UTCDateTime | None = None
+    deadline: UTCDateTime | None = None
     content: str | None = None
     completed: bool = False
-    status: TodoStatus = DEFAULT_TODO_STATUS
-    solutions: list[str] | None = None
     time_to_complete: int | None = None
     updated_at: UTCDateTime
 
@@ -103,29 +98,15 @@ class NoteCreate(_SchemaBase):
 class ToDoCreate(_SchemaBase):
     type: Literal["todo"]
     title: str = Field(min_length=1)
-    date: UTCDateTime | None = None
+    deadline: UTCDateTime | None = None
     content: str | None = None
     completed: bool = False
-    status: TodoStatus | None = None
-    solutions: Solutions | None = None
     time_to_complete: Minutes | None = None
 
     @model_validator(mode="after")
     def _require_nonblank_title(self) -> "ToDoCreate":
         if not self.title.strip():
             raise ValueError("a todo requires a non-empty title")
-        return self
-
-    @model_validator(mode="after")
-    def _sync_status_and_completed(self) -> "ToDoCreate":
-        """Either field may be given; the other follows. Both must agree if both are."""
-        if self.status is None:
-            self.status = "done" if self.completed else DEFAULT_TODO_STATUS
-        elif "completed" in self.model_fields_set and self.completed != is_completed(
-            self.status
-        ):
-            raise ValueError("completed must be true exactly when status is 'done'")
-        self.completed = is_completed(self.status)
         return self
 
 
@@ -141,8 +122,6 @@ class ItemUpdate(_SchemaBase):
 
     title: str | None = None
     content: str | None = None
-    date: UTCDateTime | None = None
+    deadline: UTCDateTime | None = None
     completed: bool | None = None
-    status: TodoStatus | None = None
-    solutions: Solutions | None = None
     time_to_complete: Minutes | None = None

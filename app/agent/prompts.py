@@ -35,7 +35,7 @@ Here are the current user-specified preferences for updating the ToDo list (may 
 
 Here are your instructions for reasoning about the user's messages:
 
-1. If the user only ASKS about what is already saved (what they need to do, what is due today or this week, a summary of their notes), answer from the Notes and ToDo List above and make no tool call. When listing ToDos, leave out ones that are `done` or `archived` unless the user asks for them, resolve relative days ("tomorrow", "next week") against the current date above, and list them soonest first.
+1. If the user only ASKS about what is already saved (what they need to do, what is due today or this week, a summary of their notes), answer from the Notes and ToDo List above and make no tool call. When listing ToDos, leave out ones that are `completed` unless the user asks for them, resolve relative days ("tomorrow", "next week") against the current date above, and list them soonest first.
 
 2. Otherwise, decide whether your long-term memory should be updated:
 - If the user wants something written down or remembered (a fact, a detail, a piece of information), call UpdateMemory with type `note`
@@ -55,6 +55,11 @@ _TRUSTCALL_PREAMBLE = """Reflect on the following interaction and record what th
 
 TODO_RULES = """Each ToDo document is a separate task:
 - A task that is not already one of the existing documents gets a NEW ToDo document.
+- Put a short one-line summary in `title`. Put details the user gave in `content`.
+- Only for a task complicated enough to need a plan, add a few concrete, actionable solutions to `content`.
+  Simple tasks get no solutions.
+- When patching a task, keep its existing `content` text and add to it; never drop it.
+- A new task always has status `todo`.
 - Patch an existing document only when the user is changing that task, and patch only the
   document(s) the user is actually talking about. A deadline or status mentioned for one
   task never applies to another.

@@ -10,14 +10,11 @@ translates between those documents and item rows:
 
     Note.title             <-> item.title
     Note.content           <-> item.content
-    ToDo.task              <-> item.title
-    ToDo.deadline          <-> item.date          (naive local time <-> UTC, via the user's tz)
-    ToDo.solutions         <-> item.solutions
+    ToDo.title             <-> item.title
+    ToDo.content           <-> item.content
+    ToDo.deadline          <-> item.deadline      (naive local time <-> UTC, via the user's tz)
     ToDo.time_to_complete  <-> item.time_to_complete
-    ToDo.status            <-> item.status        (item.completed follows: true if "done")
-
-A todo's ``content`` has no ToDo field. The agent is shown it but cannot change it, so
-details the user typed in the app always survive an agent edit.
+    ToDo.status            <-> item.completed     (item.completed follows: true if "completed")
 """
 
 import logging
@@ -30,7 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.agent.schemas import MemoryKindName, Note, ToDo
 from app.agent.state import MEMORY_SEARCH_LIMIT, ProposalRecord
-from app.models.item import DEFAULT_TODO_STATUS, TODO_STATUSES, Item, is_completed
+from app.models.item import Item
 from app.repositories.item_repository import ItemRepository
 
 logger = logging.getLogger(__name__)
@@ -55,11 +52,11 @@ def note_document(item: Item) -> Document:
 
 def todo_document(item: Item, zone: tzinfo) -> Document:
     doc: Document = {
-        "task": item.title or "",
+        "title": item.title or "",
+        "content": item.content,
         "time_to_complete": item.time_to_complete,
-        "deadline": _local_naive(item.date, zone),
-        "solutions": list(item.solutions or []),
-        "status": item.status or DEFAULT_TODO_STATUS,
+        "deadline": _local_naive(item.deadline, zone),
+        "status": "completed" if item.completed else "todo",
     }
     # Round-tripping through the schema serializes exactly as the extractor's output
     # does, so an unchanged field compares equal in the review diff.
@@ -71,11 +68,8 @@ def to_document(kind: MemoryKindName, item: Item, zone: tzinfo) -> Document:
 
 
 def to_prompt_document(kind: MemoryKindName, item: Item, zone: tzinfo) -> Document:
-    """What the chat model is shown: the document plus the todo details it cannot edit."""
-    doc = to_document(kind, item, zone)
-    if kind == "todo" and item.content:
-        doc["content"] = item.content
-    return doc
+    """What the chat model is shown."""
+    return to_document(kind, item, zone)
 
 
 # ----------------------------------------------------------------- document -> item
@@ -106,17 +100,16 @@ def _note_fields(key: str, value: Any, zone: tzinfo) -> dict[str, Any]:
 
 
 def _todo_fields(key: str, value: Any, zone: tzinfo) -> dict[str, Any]:
-    if key == "task":
+    if key == "title":
         return {"title": value}
+    if key == "content":
+        return {"content": _blank_to_none(value)}
     if key == "deadline":
-        return {"date": _to_utc(value, zone)}
-    if key == "solutions":
-        return {"solutions": list(value) or None}
+        return {"deadline": _to_utc(value, zone)}
     if key == "time_to_complete":
         return {"time_to_complete": _positive_or_none(value)}
     if key == "status":
-        status = value if value in TODO_STATUSES else DEFAULT_TODO_STATUS
-        return {"status": status, "completed": is_completed(status)}
+        return {"completed": value == "completed"}
     return {}
 
 
@@ -131,7 +124,7 @@ def to_item_fields(
     document: Document,
     zone: tzinfo,
     *,
-    keys: Iterable[str] | None = None
+    keys: Iterable[str] | None = None,
 ) -> dict[str, Any]:
     """Item column values for ``document``, restricted to ``keys`` when given."""
     mapper = _FIELD_MAPPERS[kind]
@@ -217,9 +210,15 @@ class ItemMemory:
                             kind,
                             rec["doc_id"],
                         )
+
                     fields = to_item_fields(kind, rec["value"], zone)
-                    if kind == "todo" and "status" not in fields:
-                        fields.update(status=DEFAULT_TODO_STATUS, completed=False)
+
+                    if kind == "todo":
+                        if rec["is_new"]:
+                            fields["completed"] = False
+                        else:
+                            fields.setdefault("completed", False)
+
                     session.add(
                         Item(
                             id=ids[rec["doc_id"]], user_id=user_id, type=kind, **fields

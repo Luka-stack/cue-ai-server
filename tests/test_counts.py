@@ -20,14 +20,17 @@ async def test_counts_arithmetic(client):
     now = datetime.now(UTC)
     await _create(client, {"type": "note", "title": "Note A"})
     await _create(client, {"type": "note", "content": "Note B"})
-    await _create(client, {"type": "todo", "title": "Due now", "date": _iso(now)})
-    await _create(client, {"type": "todo", "title": "Past", "date": _iso(now - timedelta(days=3))})
+    await _create(client, {"type": "todo", "title": "Due now", "deadline": _iso(now)})
+    await _create(
+        client,
+        {"type": "todo", "title": "Past", "deadline": _iso(now - timedelta(days=3))},
+    )
     await _create(
         client,
         {
             "type": "todo",
             "title": "Past done",
-            "date": _iso(now - timedelta(days=3)),
+            "deadline": _iso(now - timedelta(days=3)),
             "completed": True,
         },
     )
@@ -49,23 +52,28 @@ async def test_counts_today_respects_timezone(client):
     warsaw_day_start = now_warsaw.replace(hour=0, minute=0, second=0, microsecond=0)
     early_local = warsaw_day_start + timedelta(minutes=15)  # 00:15 Warsaw time today
 
-    await _create(client, {"type": "todo", "title": "Early bird", "date": _iso(early_local)})
+    await _create(
+        client, {"type": "todo", "title": "Early bird", "deadline": _iso(early_local)}
+    )
 
     resp = await client.get(COUNTS, params={"tz": "Europe/Warsaw"})
     assert resp.json()["today"] == 1
 
     now_utc = datetime.now(UTC)
     utc_day_start = now_utc.replace(hour=0, minute=0, second=0, microsecond=0)
-    in_utc_today = utc_day_start <= early_local.astimezone(UTC) < utc_day_start + timedelta(days=1)
+    in_utc_today = (
+        utc_day_start <= early_local.astimezone(UTC) < utc_day_start + timedelta(days=1)
+    )
     resp = await client.get(COUNTS)
     assert resp.json()["today"] == (1 if in_utc_today else 0)
 
 
 async def test_list_today_filter_matches_counts(client):
     now = datetime.now(UTC)
-    await _create(client, {"type": "todo", "title": "Due now", "date": _iso(now)})
+    await _create(client, {"type": "todo", "title": "Due now", "deadline": _iso(now)})
     await _create(
-        client, {"type": "todo", "title": "Future", "date": _iso(now + timedelta(days=5))}
+        client,
+        {"type": "todo", "title": "Future", "deadline": _iso(now + timedelta(days=5))},
     )
 
     resp = await client.get(ITEMS, params={"filter": "today"})
@@ -80,7 +88,9 @@ async def test_counts_invalid_timezone_rejected(client):
     resp = await client.get(COUNTS, params={"tz": "Mars/Olympus_Mons"})
     assert resp.status_code == 422
 
-    resp = await client.get(ITEMS, params={"filter": "today", "tz": "Mars/Olympus_Mons"})
+    resp = await client.get(
+        ITEMS, params={"filter": "today", "tz": "Mars/Olympus_Mons"}
+    )
     assert resp.status_code == 422
 
 
