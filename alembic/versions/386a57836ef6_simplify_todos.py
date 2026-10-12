@@ -27,7 +27,9 @@ def upgrade() -> None:
                 'Solutions:' || E'\\n' || (
                     SELECT string_agg('- ' || s, E'\\n')
                         FROM jsonb_array_elements_text(solutions) AS s))
-        WHERE type = 'todo' AND jsonb_array_length(solutions) > 0
+        WHERE type = 'todo'
+          AND CASE WHEN jsonb_typeof(solutions) = 'array'
+                   THEN jsonb_array_length(solutions) > 0 ELSE false END
     """)
 
     # 2. Drop constraints
